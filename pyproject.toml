@@ -1,0 +1,23 @@
+# pyproject.toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "chui"
+version = "0.1.0"
+authors = [
+  { name = "James Bressler", email = "coloradocomputerpro@incognito.tech" },
+]
+description = ""
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "cmd2>=2.4.3",
+    "rich>=13.7.0",
+    "pyyaml>=6.0.1",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+chui = "chui.__main__:main"
