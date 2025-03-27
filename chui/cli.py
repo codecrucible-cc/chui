@@ -6,14 +6,14 @@ import time
 import platform
 from typing import Dict, List, Optional, Type, Callable
 
-from .ui import UI
+from chui.ui import UI
 from .config import Config
 from chui.plugins.registry import PluginRegistry
 from .commands import BaseCommand
 from .protocols import CLIProtocol
 from chui.events.base import EventManager
 from chui.core.errors import ErrorHandler, CommandError, ErrorCategory, ErrorSeverity
-from .core import CLIUtils
+from .core.cli_utils import CLIUtils
 from .commands.pipeline import CommandPipeline
 from .commands.registry import CommandRegistry
 
@@ -201,9 +201,6 @@ class ChuiCLI(cmd2.Cmd, CLIProtocol):
     def register_plugin_command(self, name: str, command_class: Type[BaseCommand]) -> None:
         """Register a plugin command"""
         try:
-            # Register command in registry
-            self.command_registry.register(name, command_class, 'plugin')
-
             # Create command instance with pipeline
             command_instance = command_class(
                 self.ui,
@@ -211,16 +208,29 @@ class ChuiCLI(cmd2.Cmd, CLIProtocol):
                 pipeline=self.command_pipeline
             )
 
+            # Register command in registry with instance
+            self.command_registry.register(
+                name=name, 
+                command_class=command_class,
+                category='plugin',
+                instance=command_instance
+            )
+
             # Create the do_ and help_ methods
-            def do_command(self, arg):
+            def do_command(self_cmd, statement: str = '') -> bool:
                 try:
-                    parsed = self.utils.parse_command(arg)
+                    parsed = self.utils.parse_command(statement)
+                    if self.debug:
+                        self.ui.debug(f"Executing {name} with args: {parsed.args}")
+
+                    # Pass all args to execute
                     command_instance.execute(
                         parsed.args,
                         parsed.flags,
-                        parsed.options
+                        parsed.options,
+                        statement  # Pass original input
                     )
-                    return False  # Always return False to stay in CLI
+                    return False  # Stay in CLI
                 except Exception as e:
                     self.error_handler.handle(
                         error=e,
@@ -229,10 +239,10 @@ class ChuiCLI(cmd2.Cmd, CLIProtocol):
                         operation=f"execute_command({name})",
                         debug=self.debug
                     )
-                    return False  # Stay in CLI even on error
+                    return False
 
             def help_command(self):
-                self.ui.info(command_instance.help)
+                command_instance.show_help()
 
             # Add methods to class
             setattr(ChuiCLI, f'do_{name}', do_command)
@@ -619,7 +629,7 @@ class ChuiCLI(cmd2.Cmd, CLIProtocol):
         """Exit the CLI"""
         self.ui.info("Quitting...")
         self.ui.success("Goodbye! 👋")
-        time.sleep(1)
+        time.sleep(.33)
         self.clear_screen(initial=True)
         
         # Run cleanup

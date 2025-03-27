@@ -12,49 +12,56 @@ Chui enhances command-line applications by providing:
 - Configuration management with secure storage
 - Comprehensive error handling and debugging
 - Command pipeline for complex operations
-- Infrastructure management capabilities
+- Cross-platform terminal and file system abstraction
 
 ## Key Features
 
 ### Rich UI Components
-- Consistent message types (info, success, warning, error)
+- Consistent message types (info, success, warning, error, debug)
 - Interactive prompts and confirmations
-- Formatted tables and panels
-- Progress indicators and status updates
-- Color-coded output (with fallbacks)
+- Formatted tables with pagination, sorting, and filtering
+- Styled panels with multi-section support
+- Interactive forms with validation
+- List selection components
+- Color-coded output (with terminal capability detection)
 - Unicode support (with automatic detection)
+- Terminal-aware formatting
 
 ### Plugin System
 - Hot-loadable plugins
 - Dependency management
 - Event-driven communication
 - Automatic command registration
-- Plugin lifecycle management
+- Plugin lifecycle management (initialize/cleanup)
 - Configuration persistence
+- Plugin creation utilities
 
 ### Command Pipeline
 - Structured command execution
+- Namespaced commands support
 - Pre/post execution hooks
 - Error handling and recovery
 - Operation context tracking
 - Command result management
 - Timeout handling
+- Remote execution capabilities (planned)
 
 ### Configuration Management
 - Hierarchical configuration storage
 - Secure value encryption
 - Dynamic default values
 - Configuration validation
-- Import/export capabilities
+- System-aware defaults
+- Configuration UI
 - Automatic backup
 
 ### Event System
 - Event subscription/publication
 - Operation correlation
 - Event timeline tracking
-- Event replay capabilities
+- Event contexts
 - Custom event handlers
-- Event persistence
+- Event management
 
 ### Error Handling
 - Categorized errors
@@ -63,6 +70,16 @@ Chui enhances command-line applications by providing:
 - Recovery mechanisms
 - Debug output
 - Error logging
+- Security-specific error handling
+
+### Cross-Platform Utilities
+- Path management (Windows, macOS, Linux)
+- Terminal capabilities detection
+- Process management
+- Signal handling
+- Locale management
+- Temporary file handling
+- Network utilities
 
 ## Use Cases
 
@@ -104,17 +121,33 @@ Well-suited for:
 
 ## Getting Started
 
-### Installation
+### Installation & Running
+
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/your-repo/chui
 cd chui
+```
 
-# Install dependencies
-pip install -r requirements.txt
+#### Install & Run
+```bash
+pip install .
+chui
+```
+
+#### Develop & Run
+```bash
+pip install -e .
+chui
+```
+
+#### Run Locally
+```bash
+python -m chui
 ```
 
 ### Basic Usage
+
 ```python
 # Create a simple CLI application
 from chui.cli import ChuiCLI
@@ -128,28 +161,48 @@ if __name__ == "__main__":
 ```
 
 ### Plugin Development
+
+You can quickly create a new plugin using the built-in utility:
+
 ```bash
-python -m chui create_plugin myplugin --description "My awesome plugin" --author "John Doe"
+python -m chui.core.create_plugin myplugin
 ```
+
+Or create a plugin manually:
 
 ```python
 from chui.plugins.base import Plugin
-from chui.commands import BaseCommand
+from chui.commands import BaseCommand, CommandContext
 
 class MyCommand(BaseCommand):
-    def execute(self, args, flags, options):
+    @property
+    def name(self) -> str:
+        return "mycommand"
+        
+    def run(self, context: CommandContext) -> Any:
         self.ui.info("Executing command...")
-        return False  # Stay in CLI
+        # Command implementation
+        return True
 
 class MyPlugin(Plugin):
     @property
-    def name(self): return "my_plugin"
+    def name(self) -> str:
+        return "my_plugin"
     
     @property
-    def version(self): return "1.0.0"
+    def version(self) -> str:
+        return "1.0.0"
     
     def get_commands(self):
         return {"mycommand": MyCommand}
+        
+    def _initialize(self):
+        # Plugin initialization
+        pass
+        
+    def _cleanup(self):
+        # Plugin cleanup
+        pass
 ```
 
 ## Architecture
@@ -157,12 +210,15 @@ class MyPlugin(Plugin):
 ### Component Overview
 ```
 chui/
-├── cli.py           # Main CLI application
-├── commands/        # Command system
+├── __main__.py     # Entry point
+├── cli.py          # Main CLI application
+├── commands/       # Command system
+├── config.py       # Configuration management
 ├── core/           # Core functionality
 ├── events/         # Event system
 ├── plugins/        # Plugin management
-├── ui.py           # UI components
+├── protocols.py    # Protocol definitions
+├── ui/             # UI components
 └── utilities/      # Utility modules
 ```
 
@@ -181,17 +237,17 @@ Chui includes development tools:
 - Debug mode for development
 - Command templating
 - Plugin scaffolding
-- Testing utilities
-- Development console
+- Settings management UI
+- Error handling with context
 
 ## Examples
 
-### Running chui
+### Running Chui
 ```bash
 python -m chui
 ```
 
-### Running the chui Playground demo
+### Running the Chui Playground demo
 ```bash
 python demo.py
 ```
@@ -199,16 +255,20 @@ python demo.py
 ### Creating a Custom Command
 ```python
 class MyCommand(BaseCommand):
-    def execute(self, args, flags, options):
-        if flags.get('verbose'):
+    @property
+    def name(self) -> str:
+        return "mycommand"
+        
+    def run(self, context: CommandContext) -> Any:
+        if context.flags.get('verbose'):
             self.ui.debug("Verbose mode")
             
         self.ui.info("Processing...")
         
-        if 'name' in options:
-            self.ui.success(f"Hello, {options['name']}!")
+        if 'name' in context.options:
+            self.ui.success(f"Hello, {context.options['name']}!")
         
-        return False
+        return True
 ```
 
 ### User Interaction
@@ -216,15 +276,37 @@ class MyCommand(BaseCommand):
 # Get user input
 name = self.ui.prompt("Enter your name:")
 
+# Confirm with user
+if self.ui.confirm("Are you sure?", default=False):
+    self.ui.success("Confirmed!")
+
 # Show options
 options = ["Option 1", "Option 2", "Option 3"]
-choice = self.ui.select_from_list(options)
+choice = self.ui.select_option(options, title="Select an option")
 
 # Display results
 self.ui.table(
     headers=["Name", "Value"],
     rows=[["Option", choice]]
 )
+
+# Create a form
+from chui.ui.components.forms import FormField, FieldType
+fields = [
+    FormField(
+        name="username",
+        label="Username",
+        field_type=FieldType.STRING,
+        required=True
+    ),
+    FormField(
+        name="password",
+        label="Password",
+        field_type=FieldType.PASSWORD,
+        required=True
+    )
+]
+result = self.ui.input_form(fields, title="Login Form")
 ```
 
 ### Event Handling
@@ -233,18 +315,23 @@ def on_event(event):
     self.ui.info(f"Event received: {event.name}")
 
 self.events.subscribe("my_event", on_event)
-self.events.emit(Event("my_event", data={"key": "value"}))
+
+from chui.events.base import Event
+from datetime import datetime
+self.events.emit(Event(
+    name="my_event", 
+    data={"key": "value"},
+    timestamp=datetime.now()
+))
 ```
 
 ## Project Structure
 ```
 chui/
-├── app.py          # Application entry
 ├── chui/           # Framework core
 ├── plugins/        # Plugin directory
-├── tests/          # Test suite
-├── docs/           # Documentation
-└── requirements.txt
+├── pyproject.toml  # Project configuration
+└── README.md       # Documentation
 ```
 
 ## Development Status
@@ -259,15 +346,15 @@ Chui is under active development with focus on:
 
 ## Requirements
 
-- Python 3.8+
-- cmd2
-- rich
-- cryptography
-- PyYAML
+- Python 3.7+
+- rich>=12.0.0
+- cmd2>=2.4.2
+- pyyaml>=6.0
+- cryptography>=38.0.0
 
 ## Support
 
 For issues, feature requests, or development questions:
 - Check the playground plugin for examples
-- Enable debug mode for detailed output
-- Review the command documentation
+- Enable debug mode for detailed output (`chui settings set system.debug true`)
+- Use the built-in settings command to explore configuration options

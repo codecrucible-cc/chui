@@ -110,6 +110,22 @@ class ConfigUI:
             table.add_column("Value", style="magenta")
             table.add_column("Actions", style="blue")
 
+            # For debug section, handle nested dictionaries
+            if section == 'debug':
+                for subsection, subconfig in sorted(config.items()):
+                    if isinstance(subconfig, dict):
+                        for key, value in sorted(subconfig.items()):
+                            setting_path = f"{section}.{subsection}.{key}"
+                            # Debug settings are read-only
+                            table.add_row(
+                                f"{subsection}.{key}",
+                                setting_path,
+                                str(value),
+                                "read-only"
+                            )
+                return table
+
+            # Regular sections
             for key, value in sorted(config.items()):
                 if isinstance(value, dict):
                     continue
@@ -132,8 +148,15 @@ class ConfigUI:
 
             return table
 
+        # Check if debug mode is enabled
+        debug_enabled = self.config.get('system.debug', False)
+
         # Create tables for each section
         for section, settings in sorted(self.config._config.items()):
+            # Skip debug section if debug mode is not enabled
+            if section == 'debug' and not debug_enabled:
+                continue
+                
             if isinstance(settings, dict):
                 table = create_section_table(section, settings)
                 self.ui.console.print(table)
@@ -358,7 +381,6 @@ class Config:
                 'enabled': [],
                 'disabled': [],
                 'auto_load': True,
-                'paths': [str(self.path_manager.get_data_file('plugins'))]
             },
             'debug': {  # New immutable debug flags section
                 'system': {

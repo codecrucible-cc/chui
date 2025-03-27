@@ -19,32 +19,52 @@ class PluginDiscovery:
         self.config = config
         self.debug = self.config.get('system.debug', False)
 
-        # Get project root (where main app.py is located)
-        self.project_root = Path(os.getcwd())
+        # ALWAYS check the config first for plugin paths
+        configured_paths = self.config.get('plugins.paths', [])
+        
         if self.debug:
-            self.ui.debug(f"Project root: {self.project_root}")
-
-        # User plugins directory
-        self.plugins_dir = self.project_root / 'plugins'
+            self.ui.debug(f"Configured plugin paths: {configured_paths}")
+        
+        # Force use of configured plugin path if available
+        if configured_paths and isinstance(configured_paths, list) and configured_paths[0]:
+            # Use the first configured path
+            self.plugins_dir = Path(configured_paths[0]).expanduser().resolve()
+            if self.debug:
+                self.ui.debug(f"Using configured plugin path: {self.plugins_dir}")
+        else:
+            # Default to ~/.chui/plugins if no path is configured
+            self.plugins_dir = Path.home() / '.chui' / 'plugins'
+            if self.debug:
+                self.ui.debug(f"Using default plugin path: {self.plugins_dir}")
+        
+        # Set project root to the parent of plugins_dir for backward compatibility
+        # but log that we don't actually use it for plugin discovery
+        self.project_root = self.plugins_dir.parent
         if self.debug:
-            self.ui.debug(f"Plugins directory: {self.plugins_dir}")
+            self.ui.debug(f"Project root (not used for plugin discovery): {self.project_root}")
+            self.ui.debug(f"Will use plugins directory: {self.plugins_dir}")
 
         # Create plugins directory if it doesn't exist
         if not self.plugins_dir.exists():
             if self.debug:
-                self.ui.debug("Creating plugins directory...")
-            self.plugins_dir.mkdir(parents=True)
-            # Create __init__.py to make it a package
-            (self.plugins_dir / '__init__.py').touch()
-            if self.debug:
-                self.ui.debug("Created plugins directory and __init__.py")
+                self.ui.debug(f"Creating plugins directory: {self.plugins_dir}")
+            try:
+                self.plugins_dir.mkdir(parents=True, exist_ok=True)
+                # Create __init__.py to make it a package
+                init_path = self.plugins_dir / '__init__.py'
+                if not init_path.exists():
+                    init_path.touch()
+                    if self.debug:
+                        self.ui.debug(f"Created __init__.py at {init_path}")
+            except Exception as e:
+                self.ui.error(f"Error creating plugins directory: {str(e)}")
 
-        # Add plugins directory to Python path if not already there
-        plugins_path = str(self.plugins_dir.parent)
-        if plugins_path not in os.sys.path:
+        # Add plugins directory parent to Python path if not already there
+        plugins_parent = str(self.plugins_dir.parent)
+        if plugins_parent not in os.sys.path:
             if self.debug:
-                self.ui.debug(f"Adding {plugins_path} to Python path")
-            os.sys.path.insert(0, plugins_path)
+                self.ui.debug(f"Adding {plugins_parent} to Python path")
+            os.sys.path.insert(0, plugins_parent)
 
     def discover_plugins(self) -> Dict[str, Type[Plugin]]:
         """Discover all available plugins in the plugins directory"""

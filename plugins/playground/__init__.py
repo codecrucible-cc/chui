@@ -1,7 +1,9 @@
 """
-Playground plugin for Chui framework.
-A comprehensive example plugin demonstrating framework features.
-"""
-from .plugin import PlaygroundPlugin, PlaygroundCommand, setup
+Playground plugin for CHUI Framework
 
-__all__ = ['PlaygroundPlugin', 'PlaygroundCommand', 'setup']
+Demonstrates various features and capabilities of the CHUI framework
+in an interactive and fun way.
+"""
+from .plugin import PlaygroundPlugin, setup
+
+__all__ = ['PlaygroundPlugin', 'setup']

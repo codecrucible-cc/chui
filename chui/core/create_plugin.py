@@ -154,28 +154,26 @@ class PluginCreator:
     def _get_commands_template(self, name: str, description: str, author: str) -> str:
         """Get the commands.py template"""
         return dedent(f'''
-            from typing import Any, Dict, List
-            from chui.commands import BaseCommand
+            from typing import Any
+            from chui.commands import BaseCommand, CommandContext
 
             class {name.title()}Command(BaseCommand):
                 """Main command for {name} plugin"""
 
-                def execute(self, args: List[str], flags: Dict[str, bool], 
-                          options: Dict[str, str]) -> Any:
-                    """Execute the command"""
-                    # Handle help flag
-                    if flags.get('help'):
-                        self.ui.info(self.help)
-                        return True
+                @property
+                def name(self) -> str:
+                    return "{name}"
 
+                def run(self, context: CommandContext) -> Any:
+                    """Execute the command"""
                     # Get debug setting
                     debug = self.config.get('system.debug', False)
 
                     if debug:
                         self.ui.debug(f"Executing {name} command")
-                        self.ui.debug(f"Args: {{args}}")
-                        self.ui.debug(f"Flags: {{flags}}")
-                        self.ui.debug(f"Options: {{options}}")
+                        self.ui.debug(f"Args: {{context.args}}")
+                        self.ui.debug(f"Flags: {{context.flags}}")
+                        self.ui.debug(f"Options: {{context.options}}")
 
                     # Add your command logic here
                     self.ui.info("Hello from {name} plugin!")
@@ -190,9 +188,8 @@ class PluginCreator:
 
                     return True
 
-                @property
-                def help(self) -> str:
-                    """Command help text"""
+                def get_help(self) -> str:
+                    """Get command help text"""
                     return """
                     {name} plugin command
 
@@ -208,6 +205,36 @@ class PluginCreator:
                         {name} arg1 arg2        # Pass arguments
                         {name} --debug          # Enable debug output
                     """
+
+            # Example of a namespaced command (uncomment and modify as needed):
+            # class {name.title()}NamespacedCommand(BaseCommand):
+            #     """Command with subcommands"""
+            #
+            #     @property
+            #     def name(self) -> str:
+            #         return "{name}ns"
+            #     
+            #     @property
+            #     def namespace(self) -> str:
+            #         return "{name}"
+            #
+            #     def __init__(self, ui, config, pipeline=None):
+            #         super().__init__(ui, config, pipeline)
+            #         # Register subcommands
+            #         self.register_subcommand("list", self.cmd_list, "List items")
+            #         self.register_subcommand("add", self.cmd_add, "Add an item")
+            #         self.register_alias("ls", "list")  # Optional alias
+            #
+            #     def cmd_list(self, context: CommandContext) -> Any:
+            #         self.ui.info("Listing items...")
+            #         return True
+            #
+            #     def cmd_add(self, context: CommandContext) -> Any:
+            #         if not context.args:
+            #             self.ui.error("Item name required")
+            #             return False
+            #         self.ui.success(f"Adding item: {{context.args[0]}}")
+            #         return True
         ''').lstrip()
 
     def _get_test_template(self, name: str, description: str, author: str) -> str:
@@ -218,6 +245,7 @@ class PluginCreator:
             from chui.config import Config
             from chui.events.base import EventManager
             from chui.core.errors import PluginError
+            from chui.commands import CommandContext
             from .plugin import {name.title()}Plugin
             from .commands import {name.title()}Command
 
@@ -235,6 +263,20 @@ class PluginCreator:
                 ui = mocker.Mock(spec=UI)
                 config = mocker.Mock(spec=Config)
                 return {name.title()}Command(ui, config)
+
+            @pytest.fixture
+            def context():
+                """Create a test command context"""
+                return CommandContext(
+                    name="{name}",
+                    namespace=None,
+                    args=[],
+                    flags={{}},
+                    options={{}},
+                    original_input="",
+                    timestamp=None,
+                    metadata={{}}
+                )
 
             class Test{name.title()}Plugin:
                 """Test plugin functionality"""
@@ -258,20 +300,28 @@ class PluginCreator:
 
                 def test_command_help(self, command):
                     """Test command help text"""
-                    assert isinstance(command.help, str)
-                    assert len(command.help) > 0
+                    help_text = command.get_help()
+                    assert isinstance(help_text, str)
+                    assert len(help_text) > 0
 
-                def test_command_execution(self, command):
+                def test_command_execution(self, command, context):
                     """Test basic command execution"""
-                    result = command.execute([], {{}}, {{}})
+                    result = command.run(context)
                     assert result is True
                     command.ui.info.assert_called()
 
-                def test_command_help_flag(self, command):
-                    """Test help flag handling"""
-                    result = command.execute([], {{'help': True}}, {{}})
+                def test_command_with_args(self, command, context):
+                    """Test command with arguments"""
+                    context.args = ["test_arg"]
+                    result = command.run(context)
                     assert result is True
-                    command.ui.info.assert_called_with(command.help)
+
+                def test_command_with_debug(self, command, context):
+                    """Test command with debug flag"""
+                    command.config.get.return_value = True  # Enable debug
+                    result = command.run(context)
+                    assert result is True
+                    command.ui.debug.assert_called()
         ''').lstrip()
 
     def _get_readme_template(self, name: str, description: str, author: str) -> str:
@@ -300,6 +350,9 @@ class PluginCreator:
 
             # Run default command
             chui> {name}
+
+            # Pass arguments
+            chui> {name} arg1 arg2
             ```
 
             ## Development
@@ -318,4 +371,3 @@ class PluginCreator:
             ## License
             Add your license information here.
         ''').lstrip()
-

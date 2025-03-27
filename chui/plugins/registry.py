@@ -1,6 +1,7 @@
 # chui/plugins/registry.py
 
 from typing import Dict, Type, Optional, List
+from pathlib import Path
 from datetime import datetime
 from ..commands import BaseCommand
 from .base import Plugin
@@ -23,8 +24,27 @@ class PluginRegistry:
         self.cli = cli  # Store CLI reference
         self.debug = self.config.get('system.debug', False)
 
-        # Initialize discovery system
+        # Explicitly log the plugin paths from config
+        plugin_paths = self.config.get('plugins.paths', [])
+        if self.debug:
+            self.ui.debug(f"Plugin paths from config: {plugin_paths}")
+            
+            # Verify home directory is being properly resolved
+            home_dir = str(Path.home())
+            self.ui.debug(f"Home directory: {home_dir}")
+            
+            # If the path uses ~, show the expanded version
+            if plugin_paths and isinstance(plugin_paths, list) and plugin_paths[0]:
+                if plugin_paths[0].startswith('~'):
+                    expanded = str(Path(plugin_paths[0]).expanduser())
+                    self.ui.debug(f"Expanded plugin path: {expanded}")
+
+        # Initialize discovery system with explicit parameters
         self.discovery = PluginDiscovery(ui=self.ui, config=self.config)
+
+        # Log the actual plugin directory being used
+        if self.debug:
+            self.ui.debug(f"Actual plugin directory: {self.discovery.plugins_dir}")
 
         # Command pipeline reference from CLI
         self.command_pipeline = cli.command_pipeline
